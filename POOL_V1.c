@@ -117,7 +117,7 @@ int main(void)
 	
 }
 /* ISR routine to save responses/new message */
-ISR(USART_RXC_vect)
+ISR(USART_RX_vect)
 {
 	buffer[buffer_pointer] = UDR0;	/* copy UDR (received value) to buffer */
 	buffer_pointer++;
