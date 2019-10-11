@@ -73,56 +73,56 @@ int main(void)
 	GSM_Begin();               //this starts the GSM with AT
 	LCD_Clear();
 	
-		while (1){
-			
-			/*check if any new message received */
-			if(status_flag==1){
-				is_msg_arrived = GSM_Wait_For_Msg();        /*check for message arrival*/
-				if(is_msg_arrived== true)
-				{
-					LCD_Clear();
-					LCD_String_xy(1,0,"new message");         /* new message arrived */
-					_delay_ms(1000);
-					LCD_Clear();
-					GSM_Msg_Read(position);                  /* read arrived message */
-					_delay_ms(3000);
-					
-					
-					/*check if received message is "call me" */
-// 					if(strstr( message_received,"call me")){
-// 						
-// 						GSM_Calling(Mobile_no);              /* call sender of message */
-// 						LCD_Clear();
-// 						LCD_String_xy(1,0,"Calling...");
-// 						_delay_ms(15000);
-// 						GSM_HangCall(); /* hang call */
-// 						LCD_String_xy(1,0,"Hang Call");
-// 						_delay_ms(1000);
-// 					}
-					
-					LCD_Clear();
-					GSM_Msg_Delete(position); /* to save SIM memory delete current message */
-					LCD_String_xy(1,0,"Clear msg");
-					GSM_Response();
-					_delay_ms(1000);
-					
-				}
-				
-				
-				is_msg_arrived=0;
-				status_flag=0;
+	while (1){
+		
+		/*check if any new message received */
+		if(status_flag==1){
+			is_msg_arrived = GSM_Wait_For_Msg();        /*check for message arrival*/
+			if(is_msg_arrived== true)
+			{
 				LCD_Clear();
+				LCD_String_xy(1,0,"new message");         /* new message arrived */
+				_delay_ms(1000);
+				LCD_Clear();
+				GSM_Msg_Read(position);                  /* read arrived message */
+				_delay_ms(3000);
+				
+							
+				/*
+				
+				CHECK FOR THE 20BOB HERE
+				
+				*/			
+				
+				
+				LCD_Clear();
+				GSM_Msg_Delete(position); /* to save SIM memory delete current message */
+				LCD_String_xy(1,0,"Clear msg");
+				GSM_Response();
+				_delay_ms(1000);
+				
 			}
-			LCD_String_xy(1,0,"waiting for msg");
-			memset(Mobile_No, 0, 14);
-			memset(message_received, 0, 60);
 			
 			
+			is_msg_arrived=0;
+			status_flag=0;
+			LCD_Clear();
 		}
+		LCD_String_xy(1,0,"waiting for msg");
+		memset(Mobile_No, 0, 14);
+		memset(message_received, 0, 60);
+		
+		
+	}
 	
 }
-
-
+/* ISR routine to save responses/new message */
+ISR(USART_RXC_vect)
+{
+	buffer[buffer_pointer] = UDR0;	/* copy UDR (received value) to buffer */
+	buffer_pointer++;
+	status_flag = 1;		/* flag for new message arrival */
+}
 
 
 
@@ -140,11 +140,11 @@ void GSM_Begin(void)
 			GSM_Response();
 			memset(buffer, 0, 160);
 			break;
-		}   
+		}
 		else
 		{
 			LCD_String("Error occurred!");
-		}  
+		}
 	}
 	_delay_ms(1000);
 	
@@ -228,7 +228,7 @@ void GSM_Response_Display(void)
 		buffer_pointer++;
 		lcd_pointer++;
 		
-		if(lcd_pointer == 15)        //lcd has reached the end 
+		if(lcd_pointer == 15)        //lcd has reached the end
 		{
 			LCD_Command(0x80);       //force cursor to first line first position
 		}
@@ -244,7 +244,7 @@ void GSM_Msg_Read(int position)
 	char read_cmd[10];
 	sprintf(read_cmd, "AT+CMGR=%d\r", position);
 	UART_SendString(read_cmd);
-    GSM_Msg_Display();
+	GSM_Msg_Display();
 }
 
 void GSM_Msg_Display(void)
@@ -401,7 +401,7 @@ void GSM_Delete_All_Msgs(void)
 
 void UART_Init(void)
 {
-	UCSR0B |= (1 << TXEN0) | (1 << RXEN0);   //enable receiver and transmitter
+	UCSR0B |= (1 << TXEN0) | (1 << RXEN0) | (1 << RXCIE0);   //enable receiver and transmitter, usart receive complete interrupt enabled
 	UCSR0C |= (1 << UCSZ01) | (1 << UCSZ00);   //8bit data, 1 stop bit, no parity
 	UBRR0H = (unsigned char) (BAUD_PRESCALE >> 8);  //shift the baud rate to the two registers
 	UBRR0L = BAUD_PRESCALE;
