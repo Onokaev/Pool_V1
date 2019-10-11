@@ -23,7 +23,7 @@ int position = 0;
 
 
 //gsm functions
-ISR(USART_RXC_vect)
+ISR(USART_RX_vect)
 {
 	buffer[buffer_pointer] = UDR0;	/* copy UDR (received value) to buffer */
 	buffer_pointer++;
