@@ -23,6 +23,14 @@ int position = 0;
 
 
 //gsm functions
+ISR(USART_RXC_vect)
+{
+	buffer[buffer_pointer] = UDR0;	/* copy UDR (received value) to buffer */
+	buffer_pointer++;
+	status_flag = 1;		/* flag for new message arrival */
+}
+
+
 void GSM_Begin(void)
 {
 	while(1)
