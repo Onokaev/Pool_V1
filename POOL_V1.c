@@ -91,6 +91,7 @@ int main(void)
 				if(*(pointer) == 2 && *(pointer + 1) == 0 )
 				{
 					//turn the high torque stepper motor on to push balls out
+					Stepper_Motor();
 				}
 				
 				
