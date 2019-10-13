@@ -4,7 +4,7 @@ void GSM_Response(void);
 void GSM_Response_Display(void);
 void GSM_Msg_Read(int x);
 bool GSM_Wait_For_Msg(void);
-void GSM_Msg_Display(void);
+char *GSM_Msg_Display(void);
 void GSM_Msg_Delete(unsigned int y);
 void GSM_Delete_All_Msgs(void);
 
@@ -150,13 +150,15 @@ void GSM_Msg_Read(int position)
     GSM_Msg_Display();
 }
 
-void GSM_Msg_Display(void)
+char *GSM_Msg_Display(void)
 {
+	static char value[2];       //we only need 20
 	_delay_ms(500);
 	if(!(strstr(buffer,"+CMGR")))	/*check for +CMGR response */
 	{
 		LCD_String_xy(1,0,"No message");
 	}
+	
 	else
 	{
 		buffer_pointer = 0;
@@ -165,7 +167,7 @@ void GSM_Msg_Display(void)
 		{
 			/*wait till \r\n not over*/
 
-			if(buffer[buffer_pointer] =='\r' || buffer[buffer_pointer] == 'n')
+			if(buffer[buffer_pointer] =='\r' || buffer[buffer_pointer] == '\n')
 			{
 				buffer_pointer++;
 			}
@@ -174,11 +176,11 @@ void GSM_Msg_Display(void)
 		}
 		
 		/* search for first comma ',' to get mobile no.*/
-		while(buffer[buffer_pointer]!=',')
+		while(buffer[buffer_pointer] != ',')
 		{
 			buffer_pointer++;
 		}
-		buffer_pointer = buffer_pointer + 2;
+		buffer_pointer = buffer_pointer + 2;    //mobile number is here
 
 		/* extract mobile no. of message sender */
 		for(int i = 0 ; i <= 12 ; i++)                         //confirm length of phone number for safaricom
@@ -187,10 +189,12 @@ void GSM_Msg_Display(void)
 			buffer_pointer++;
 		}
 		
+		
 		do
 		{
 			buffer_pointer++;
-		}while(buffer[buffer_pointer-1]!= '\n');
+		}while(buffer[buffer_pointer - 1] != '\n');
+		
 		
 		LCD_Command(0xC0);
 		int i=0;
@@ -209,10 +213,37 @@ void GSM_Msg_Display(void)
 		}
 		
 		buffer_pointer = 0;
+		
+		//we can extract the 20shillings of transaction from here
+		//here is a sample of an mpesa transaction.
+		/*
+		NJC0B23QT6 Confirmed. Ksh20.00 sent to Evans Onoka 0710997856 on 12/10/19 at 9.18pm...
+		what we need is the 20.00 from this message
+		
+		*/
+		while(buffer[buffer_pointer] != '.')   
+		{
+			buffer_pointer++;
+		}
+		for (int i = 0; i< 4 ; i++)
+		{
+			buffer_pointer++;
+		}
+		
+		for (int i = 0; i < 2 ; i++)
+		{
+			value[i] = buffer[buffer_pointer];
+			buffer_pointer++;
+		}
+			
+		
+		
 		memset(buffer , 0 , strlen(buffer));
 	}
 	status_flag = 0;
+	return value;
 }
+
 
 bool GSM_Wait_For_Msg(void)
 {
