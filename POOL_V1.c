@@ -36,7 +36,7 @@ void GSM_Response(void);
 void GSM_Response_Display(void);
 void GSM_Msg_Read(int x);
 bool GSM_Wait_For_Msg(void);
-void GSM_Msg_Display(void);
+char *GSM_Msg_Display(void);
 void GSM_Msg_Delete(unsigned int y);
 void GSM_Delete_All_Msgs(void);
 
@@ -46,13 +46,6 @@ volatile int buffer_pointer;
 char Mobile_No[10];                //buffer to hold mobile number of received mmessage
 char message_received[60];        //store messages
 int position = 0;                 //save location of current message
-
-
-
-
-
-
-
 
 
 int main(void)
@@ -73,10 +66,13 @@ int main(void)
 	GSM_Begin();               //this starts the GSM with AT
 	LCD_Clear();
 	
+	char *pointer;
+	
 	while (1){
 		
 		/*check if any new message received */
-		if(status_flag==1){
+		if(status_flag==1)                               //status flag is set to 1 anytime something is received on UDR0 register in the ISR
+		{                   
 			is_msg_arrived = GSM_Wait_For_Msg();        /*check for message arrival*/
 			if(is_msg_arrived== true)
 			{
@@ -84,17 +80,21 @@ int main(void)
 				LCD_String_xy(1,0,"new message");         /* new message arrived */
 				_delay_ms(1000);
 				LCD_Clear();
-				GSM_Msg_Read(position);                  /* read arrived message */
+				GSM_Msg_Read(position);                  //sends the read message command to the gsm
 				_delay_ms(3000);
 				
-							
-				/*
-				
-				CHECK FOR THE 20BOB HERE
-				
-				*/			
+				pointer = GSM_Msg_Display();         //gsm_msg_display returns a pointer to the location of 20.
 				
 				
+				//this part can be changed later for emerging needs
+				
+				if(*(pointer) == 2 && *(pointer + 1) == 0 )
+				{
+					//turn the high torque stepper motor on to push balls out
+				}
+				
+				
+						
 				LCD_Clear();
 				GSM_Msg_Delete(position); /* to save SIM memory delete current message */
 				LCD_String_xy(1,0,"Clear msg");
@@ -125,8 +125,6 @@ ISR(USART_RX_vect)
 }
 
 
-
-
 //gsm functions
 void GSM_Begin(void)
 {
@@ -137,8 +135,8 @@ void GSM_Begin(void)
 		_delay_ms(500);
 		if(strstr(buffer, "OK"))
 		{
-			GSM_Response();
-			memset(buffer, 0, 160);
+			GSM_Response();            //checks for the first carriage return or new line then displays the message on lcd
+			memset(buffer, 0, 160);     //clear the buffer by writing 0s on its location
 			break;
 		}
 		else
@@ -152,7 +150,7 @@ void GSM_Begin(void)
 	LCD_String_xy(0,0,"Text Mode");
 	LCD_Command(0xC0);
 	UART_SendString("AT+CMGF=1\r");              //set GSM in text mode
-	GSM_Response();
+	GSM_Response();                   //should display OK on screen if setting to text mode successful
 	_delay_ms(1000);
 	
 }
@@ -208,7 +206,7 @@ void GSM_Response_Display(void)
 	
 	while(1)
 	{
-		//search for /r/n in string
+		//search for /r/n in string then display later after these
 		
 		if(buffer[buffer_pointer] == '\r' || buffer[buffer_pointer] == '\n')
 		{
@@ -222,7 +220,7 @@ void GSM_Response_Display(void)
 	
 	LCD_Command(0xC0);
 	
-	while(buffer[buffer_pointer] != '\r')
+	while(buffer[buffer_pointer] != '\r')     //while we havent gotten to the end of the string, display the message
 	{
 		LCD_Char(buffer[buffer_pointer]);
 		buffer_pointer++;
@@ -247,13 +245,15 @@ void GSM_Msg_Read(int position)
 	GSM_Msg_Display();
 }
 
-void GSM_Msg_Display(void)
+char *GSM_Msg_Display(void)
 {
+	static char value[2];       //we only need 20
 	_delay_ms(500);
 	if(!(strstr(buffer,"+CMGR")))	/*check for +CMGR response */
 	{
 		LCD_String_xy(1,0,"No message");
 	}
+	
 	else
 	{
 		buffer_pointer = 0;
@@ -262,7 +262,7 @@ void GSM_Msg_Display(void)
 		{
 			/*wait till \r\n not over*/
 
-			if(buffer[buffer_pointer] =='\r' || buffer[buffer_pointer] == 'n')
+			if(buffer[buffer_pointer] =='\r' || buffer[buffer_pointer] == '\n')
 			{
 				buffer_pointer++;
 			}
@@ -271,11 +271,11 @@ void GSM_Msg_Display(void)
 		}
 		
 		/* search for first comma ',' to get mobile no.*/
-		while(buffer[buffer_pointer]!=',')
+		while(buffer[buffer_pointer] != ',')
 		{
 			buffer_pointer++;
 		}
-		buffer_pointer = buffer_pointer + 2;
+		buffer_pointer = buffer_pointer + 2;    //mobile number is here
 
 		/* extract mobile no. of message sender */
 		for(int i = 0 ; i <= 12 ; i++)                         //confirm length of phone number for safaricom
@@ -284,10 +284,12 @@ void GSM_Msg_Display(void)
 			buffer_pointer++;
 		}
 		
+		
 		do
 		{
 			buffer_pointer++;
-		}while(buffer[buffer_pointer-1]!= '\n');
+		}while(buffer[buffer_pointer - 1] != '\n');
+		
 		
 		LCD_Command(0xC0);
 		int i=0;
@@ -306,9 +308,35 @@ void GSM_Msg_Display(void)
 		}
 		
 		buffer_pointer = 0;
+		
+		//we can extract the 20shillings of transaction from here
+		//here is a sample of an mpesa transaction.
+		/*
+		NJC0B23QT6 Confirmed. Ksh20.00 sent to Evans Onoka 0710997856 on 12/10/19 at 9.18pm...
+		what we need is the 20.00 from this message
+		
+		*/
+		while(buffer[buffer_pointer] != '.')   
+		{
+			buffer_pointer++;
+		}
+		for (int i = 0; i< 4 ; i++)
+		{
+			buffer_pointer++;
+		}
+		
+		for (int i = 0; i < 2 ; i++)
+		{
+			value[i] = buffer[buffer_pointer];
+			buffer_pointer++;
+		}
+			
+		
+		
 		memset(buffer , 0 , strlen(buffer));
 	}
 	status_flag = 0;
+	return value;
 }
 
 bool GSM_Wait_For_Msg(void)
@@ -321,7 +349,7 @@ bool GSM_Wait_For_Msg(void)
 	
 	while(1)
 	{
-		//eliminate \r\n which is star of string
+		//eliminate \r\n which is start of string
 		
 		if(buffer[buffer_pointer] == '\r' || buffer[buffer_pointer] == '\n')
 		{
@@ -335,7 +363,7 @@ bool GSM_Wait_For_Msg(void)
 	}
 	
 	
-	if(strstr(buffer, "CMTI:"))
+	if(strstr(buffer, "CMTI:"))   //cmti checks if new message has been received
 	{
 		while(buffer[buffer_pointer] != ',')
 		{
@@ -353,8 +381,7 @@ bool GSM_Wait_For_Msg(void)
 			i++;
 		}
 		
-		//convert string of position to integer
-		
+		//convert string of position to integer	
 		position = atoi(msg_location);
 		
 		memset(buffer, 0, strlen(buffer));
